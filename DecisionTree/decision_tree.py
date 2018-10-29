@@ -16,10 +16,36 @@ class Attribute:
 
 class TreeNode:
 
-	def __init__(self, value, prediction = None):
+	def __init__(self, value, predicted_value = None):
 		self.value = value
-		self.prediction = prediction
-		self.predicted = prediction != None
+		self.predicted_value = predicted_value
+		self.subtree = []
+
+	def __str__(self):
+		if self.isPredicted():
+			return "{} {}".format(self.value, self.predicted_value)
+		else:
+			return "{}".format(self.value)
+
+	def printTree(self, depth = 0):
+		tab_str = " * "
+		tab = tab_str * depth
+		print("{} {}".format(tab, self.value))
+		tab += tab_str
+		for node in self.subtree:
+			if not node.isPredicted():
+				node.printTree(depth + 1)
+				# printTree(node, depth + 1)
+			else:
+				print("{} {}".format(tab, node))
+				# print(node)
+
+	def append(self, value):
+		self.subtree.append(value)
+
+	def isPredicted(self):
+		return not self.subtree
+
 
 def openFile(file_name):
 	file = open(file_name)
@@ -39,7 +65,8 @@ def openFile(file_name):
 	for i in range(len(samples[0])):
 		values = list({x[i] for x in samples}) # set of all different attribute values
 		if values[0].isdigit(): # if the first value is a digit, assume all are numeric
-			attributes.append([])
+			# attributes.append(Attribute(i, []))
+			pass
 		else:
 			attributes.append(Attribute(i, values))
 
@@ -62,7 +89,7 @@ def isSameClass(samples):
 def mode(samples):
 	#If there are no attributes left, label the node with the majority classification for the remaining examples
 	count = Counter(getClass(s) for s in samples)
-	return list(count.most_common(1)[0][0])
+	return count.most_common(1)[0][0]
 	"""classes = getAllClasses(samples)
 	classes_count = dict.fromkeys(classes, 0)
 	for s in samples:
@@ -110,27 +137,21 @@ def trainDecisionTree(samples, attributes, default):
 	if not samples:
 		return default
 	if isSameClass(samples):
-		return list(getClass(samples[0]))
+		return getClass(samples[0])
 	if not attributes:
 		return mode(samples)
 
 	best = chooseAttribute(samples, attributes)
 	attributes.remove(best)
 
-	tree = [TreeNode(best.id)]
+	tree = TreeNode(best.id)
 	for value in best.values:
 		subset = createSubset(samples, best.id, value)
 		subtree = trainDecisionTree(subset, attributes, mode(samples))
+		if not isinstance(subtree, TreeNode):
+			subtree = TreeNode(value, subtree)
 		tree.append(subtree)
 	return tree
-
-def printTree(root, depth = 0):
-	tab = " * " * depth
-	for node in root:
-		if isinstance(node, list):
-			printTree(node, depth + 1)
-		else:
-			print("{} {}".format(tab, node))
 
 def main():
 	if len(sys.argv) != 2:
@@ -143,8 +164,8 @@ def main():
 	# print(attributes[0])
 	# print(getRemainder(samples, attributes[1], 1))
 
-	tree = trainDecisionTree(samples, attributes, [TreeNode()])
-	printTree(tree)
+	tree = trainDecisionTree(samples, attributes, [TreeNode(None, None)])
+	tree.printTree()
 
 main()
 
