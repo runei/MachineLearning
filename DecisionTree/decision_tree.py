@@ -2,14 +2,20 @@ from __future__ import division
 import sys
 import operator as op
 import math
-# from anytree import Node, RenderTree
+from enum import Enum#, auto
 from collections import Counter
+
+class AttrType(Enum): #auto() only for python 3
+	DISCRETE = 1# auto()
+	CONTINUOUS = 2#auto()
 
 class Attribute:
 
-	def __init__(self, _id, values):
+	def __init__(self, _id, _values, _type, _mean = 0):
 		self.id = _id
-		self.values = values
+		self.values = _values
+		self.type = _type
+		self.mean = _mean
 
 	def __str__(self):
 		return "id = {}\nvalues = {}".format(self.id, self.values)
@@ -46,6 +52,14 @@ class TreeNode:
 	def isPredicted(self):
 		return not self.subtree
 
+def discretizeContinuousAttributes(samples, attributes):
+	for row in samples:
+		for attr in attributes:
+			if attr.type == AttrType.CONTINUOUS:
+				if float(row[attr.id]) < attr.mean:
+					row[attr.id] = attr.values[0]
+				else:
+					row[attr.id] = attr.values[1]
 
 def openFile(file_name):
 	file = open(file_name)
@@ -66,9 +80,14 @@ def openFile(file_name):
 		values = list({x[i] for x in samples}) # set of all different attribute values
 		if values[0].isdigit(): # if the first value is a digit, assume all are numeric
 			# attributes.append(Attribute(i, []))
-			pass
+			mean = sum([float(row[i]) for row in samples]) / len(samples)
+			possible_vals = ["<{}".format(mean), ">={}".format(mean)]
+			attributes.append(Attribute(i, possible_vals, AttrType.CONTINUOUS, mean))
+			# pass
 		else:
-			attributes.append(Attribute(i, values))
+			attributes.append(Attribute(i, values, AttrType.DISCRETE))
+
+	discretizeContinuousAttributes(samples, attributes)
 
 	return samples, attributes[:-1] #last attribute is the class where the sample belongs
 
@@ -108,11 +127,21 @@ def getEntropy(samples):
 		# entropy += -pi * math.log2(pi) #math.log2 is python 3.3
 	return entropy
 
-def createSubset(samples, attr_id, value):
+def isGreaterThan(a, b):
+	return a > b
+
+def isLowerThan(a, b):
+	return a < b
+
+def createSubset(samples, attr_id, value, attr_type):
 	subset = []
 	for row in samples:
+		# if attr_type == AttrType.DISCRETE:
 		if row[attr_id] == value:
 			subset.append(row)
+		# elif attr_type == AttrType.CONTINUOUS:
+		# 	if row[attr_id] > mean:
+		# 		subset.append(row)
 	return subset
 
 def getRemainder(samples, attr):
@@ -120,16 +149,20 @@ def getRemainder(samples, attr):
 	total_count = len(samples)
 	attr_count = Counter(row[attr.id] for row in samples)
 	for value, count in attr_count.items():
-		subset = createSubset(samples, attr.id, value)
+		subset = createSubset(samples, attr.id, value, attr.type)
 		remainder += count / total_count * getEntropy(subset)
 	return remainder
 
-def chooseAttribute(samples, attributes):
-	entropy = getEntropy(samples)
+def getInformationGain(samples, attributes, entropy):
 	information_gain = []
 	for attr in attributes:
 		if attr.values:
 			information_gain.append(entropy - getRemainder(samples, attr))
+	return information_gain
+
+def chooseAttribute(samples, attributes):
+	entropy = getEntropy(samples)
+	information_gain = getInformationGain(samples, attributes, entropy)
 	best = information_gain.index(max(information_gain))
 	return attributes[best]
 
@@ -146,7 +179,7 @@ def trainDecisionTree(samples, attributes, default):
 
 	tree = TreeNode(best.id)
 	for value in best.values:
-		subset = createSubset(samples, best.id, value)
+		subset = createSubset(samples, best.id, value, best.type)
 		subtree = trainDecisionTree(subset, attributes, mode(samples))
 		if not isinstance(subtree, TreeNode):
 			subtree = TreeNode(value, subtree)
