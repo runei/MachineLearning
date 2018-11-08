@@ -46,6 +46,19 @@ class TreeNode:
 				print("{} {}".format(tab, node))
 				# print(node)
 
+	def predict(self, sample):
+		next_node = None #initialize value
+		for node in self.subtree:
+			if node.isPredicted():
+				if sample[self.value] == node.value:
+					return node.predicted_value
+			else:
+				next_node = node
+		if next_node == None:
+			print("Cant predict value! Error on the tree! {}\n{}".format(self.value, sample))
+			sys.exit(1)
+		return next_node.predict(sample)
+
 	def append(self, value):
 		self.subtree.append(value)
 
@@ -105,7 +118,7 @@ def isSameClass(samples):
 			return False
 	return True
 
-def mode(samples):
+def majority(samples):
 	#If there are no attributes left, label the node with the majority classification for the remaining examples
 	count = Counter(getClass(s) for s in samples)
 	return count.most_common(1)[0][0]
@@ -172,7 +185,7 @@ def trainDecisionTree(samples, attributes, default):
 	if isSameClass(samples):
 		return getClass(samples[0])
 	if not attributes:
-		return mode(samples)
+		return majority(samples)
 
 	best = chooseAttribute(samples, attributes)
 	attributes.remove(best)
@@ -180,25 +193,33 @@ def trainDecisionTree(samples, attributes, default):
 	tree = TreeNode(best.id)
 	for value in best.values:
 		subset = createSubset(samples, best.id, value, best.type)
-		subtree = trainDecisionTree(subset, attributes, mode(samples))
+		subtree = trainDecisionTree(subset, attributes, majority(samples))
 		if not isinstance(subtree, TreeNode):
 			subtree = TreeNode(value, subtree)
 		tree.append(subtree)
 	return tree
 
+def makePrediction(samples, tree):
+	correct_predictions = [samp for samp in samples if tree.predict(samp) == getClass(samp)]
+	print("{}%".format(len(correct_predictions) / len(samples) * 100))
+
 def main():
-	if len(sys.argv) != 2:
-		print("Usage: python {} <file_name>".format(sys.argv[0]))
+	if len(sys.argv) != 3:
+		print("Usage: python {} <test_filename> <data_filename>".format(sys.argv[0]))
 		sys.exit(1)
 
-	file_name = sys.argv[1]
-	samples, attributes = openFile(file_name)
-	# print(mode(samples))
+	test_filename = sys.argv[1]
+	data_filename = sys.argv[2]
+
+	samples, attributes = openFile(test_filename)
+	samples_to_predict, _ = openFile(test_filename)
+	# print(majority(samples))
 	# print(attributes[0])
 	# print(getRemainder(samples, attributes[1], 1))
 
 	tree = trainDecisionTree(samples, attributes, [TreeNode(None, None)])
-	tree.printTree()
+	# tree.printTree()
+	makePrediction(samples_to_predict, tree)
 
 main()
 
